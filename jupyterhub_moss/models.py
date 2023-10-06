@@ -3,16 +3,9 @@ from __future__ import annotations
 import re
 from typing import Dict, Optional
 
-from pydantic import (
-    constr,
-    field_validator,
-    BaseModel,
-    ConfigDict,
-    FieldValidationInfo,
-    NonNegativeInt,
-    PositiveInt,
-    RootModel,
-)
+from pydantic import (BaseModel, ConfigDict, FieldValidationInfo,
+                      NonNegativeInt, PositiveInt, RootModel, constr,
+                      field_validator)
 
 # Validators
 
@@ -37,6 +30,7 @@ class PartitionResources(BaseModel, frozen=True, extra="allow"):
     max_nprocs: PositiveInt
     max_mem: PositiveInt
     gpu: str
+    gpu_types: list
     max_ngpus: NonNegativeInt
     max_runtime: PositiveInt
 
@@ -94,6 +88,7 @@ class _PartitionTraits(PartitionConfig, frozen=True, extra="forbid"):
     """Configuration of a single partition passed as ``partitions`` traits"""
 
     gpu: Optional[str] = None
+    gpu_types: Optional[list] = None
     max_ngpus: Optional[int] = None
     max_nprocs: Optional[int] = None
     max_runtime: Optional[int] = None

@@ -12,20 +12,10 @@ from batchspawner import SlurmSpawner, format_template
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PrefixLoader
 from pydantic import ValidationError
 
-from .models import (
-    PartitionAllResources,
-    PartitionInfo,
-    PartitionResources,
-    PartitionsTrait,
-    UserOptions,
-)
-from .utils import (
-    create_prologue,
-    file_hash,
-    local_path,
-    parse_gpu_resource,
-    parse_timelimit,
-)
+from .models import (PartitionAllResources, PartitionInfo, PartitionResources,
+                     PartitionsTrait, UserOptions)
+from .utils import (create_prologue, file_hash, local_path, parse_gpu_resource,
+                    parse_timelimit)
 
 # Compute resources hash once at start-up
 RESOURCES_HASH = {
@@ -119,15 +109,8 @@ class MOSlurmSpawner(SlurmSpawner):
         """
         partitions_info: dict[str, PartitionResources] = {}
 
-        partition_nnodes_idle = {}
-        partition_nnodes_total = {}
-        partition_ncores_idle = {}
-        partition_ncores_total = {}
-        partition_gpu_gres_templates = {}
-        partition_gpus_total = {}
-        partition_max_nproc = {}
-        partition_max_mem = {}
-        partition_runtime = {}
+        # Temporary storage to accumulate all the partition informaiton
+        r = {}
         for line in slurm_info_out.splitlines():
             (
                 partition,
@@ -145,53 +128,58 @@ class MOSlurmSpawner(SlurmSpawner):
             # gpu count - gpu:type:total(indices)
 
             try:
-                gpu_gres_template, gpus = parse_gpu_resource(generic_resources)
-                gpus_total += gpus
+                gpu_gres_template, gpus, gpu_type = parse_gpu_resource(generic_resources)
             except ValueError:
                 gpu_gres_template = ""
-                gpus_total = "0"
+                gpus = 0
+                gpu_type = None
 
             try:
                 max_runtime = parse_timelimit(timelimit)
             except ValueError:
-                self.log.warning(
-                    f"Parsing timelimit '{timelimit}' failed: set to 1 day"
-                )
                 max_runtime = datetime.timedelta(days=1)
 
-            if partition in partition_nnodes_idle:
-                partition_nnodes_idle[partition] += nnodes_idle
-                partition_nnodes_total[partition] += nnodes_total
-                partition_ncores_idle[partition] += ncores_idle
-                partition_ncores_total[partition] += ncores_total
-                partition_gpus_total[partition] += gpus_total
-                partition_gpu_gres_templates[partition].append(gpu_gres_template)
-                partition_max_nproc[partition] = max(partition_max_nproc[partition],ncores_per_node.rstrip("+"))
-                partition_max_mem[partition] = max(partition_max_mem[partition],memory.rstrip("+"))
+            if partition in r:
+                r[partition]['nnodes_idle'] += int(nnodes_idle)
+                r[partition]['nnodes_total'] += int(nnodes_total)
+                r[partition]['ncores_idle'] += int(ncores_idle)
+                r[partition]['ncores_total'] += int(ncores_total)
+                r[partition]['max_gpus'] = max(r[partition]['max_gpus'], int(gpus))
+                r[partition]['max_nproc'] = max(r[partition]['max_nproc'],int(ncores_per_node.rstrip("+")))
+                r[partition]['max_mem'] = max(r[partition]['max_mem'],int(memory.rstrip("+")))
             else:
-                partition_nnodes_idle[partition] = nnodes_idle
-                partition_nnodes_total[partition] = nnodes_total
-                partition_ncores_idle[partition] = ncores_idle
-                partition_ncores_total[partition] = ncores_total
-                partition_gpus_total[partition] = gpus_total
-                partition_gpu_gres_templates[partition] = [gpu_gres_template]
-                partition_max_nproc[partition] = ncores_per_node.rstrip("+")
-                partition_max_mem[partition] = memory.rstrip("+")
-                partition_runtime[partition] = max_runtime.total_seconds()
-        for partition in partition_nnodes_idle.keys():
+                r[partition] = {}
+                r[partition]['gpu_types'] = ['Any']
+                r[partition]['nnodes_idle'] = int(nnodes_idle)
+                r[partition]['nnodes_total'] = int(nnodes_total)
+                r[partition]['ncores_idle'] = int(ncores_idle)
+                r[partition]['ncores_total'] = int(ncores_total)
+                r[partition]['max_gpus'] = int(gpus)
+                r[partition]['max_nproc'] = int(ncores_per_node.rstrip("+"))
+                r[partition]['max_mem']= int(memory.rstrip("+"))
+                r[partition]['runtime'] = max_runtime.total_seconds()
+            if gpu_type:
+                r[partition]['gpu_types'].append(gpu_type)
+
+        for partition in r.keys():
+            if r[partition]['max_gpus'] > 0:
+                r[partition]['gpu_gres_templates'] = 'gpu:{}'
+            else:
+                r[partition]['gpu_gres_templates'] = ''
             try:
                 resources = PartitionAllResources(
                     # display resource counts
-                    nnodes_total=partition_nnodes_total[partition],
-                    nnodes_idle=partition_nnodes_idle[partition],
-                    ncores_total=partition_ncores_total[partition],
-                    ncores_idle=partition_ncores_idle[partition],
+                    nnodes_total=r[partition]['nnodes_total'],
+                    nnodes_idle=r[partition]['nnodes_idle'],
+                    ncores_total=r[partition]['ncores_total'],
+                    ncores_idle=r[partition]['ncores_idle'],
                     # required resource counts
-                    max_nprocs=partition_max_nproc[partition],
-                    max_mem=partition_max_mem[partition],
-                    gpu=partition_gpu_gres_templates[partition],
-                    max_ngpus=partition_gpus_total[partition],
-                    max_runtime=partition_runtime[partition],
+                    max_nprocs=r[partition]['max_nproc'],
+                    max_mem=r[partition]['max_mem'],
+                    gpu=r[partition]['gpu_gres_templates'],
+                    gpu_types = r[partition]['gpu_types'],
+                    max_ngpus=r[partition]['max_gpus'],
+                    max_runtime=r[partition]['runtime'],
                 )
             except ValidationError as err:
                 self.log.error("Error parsing output of slurm_info_cmd: %s", err)

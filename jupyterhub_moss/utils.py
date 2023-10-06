@@ -44,7 +44,7 @@ def parse_timelimit(timelimit: str) -> datetime.timedelta:
     )
 
 
-_GPU_GRES_REGEXP = re.compile(r"^gpu:(?P<type_>[^:]+):(?P<count>[0-9]+)(?:\(.*\))?$")
+_GPU_GRES_REGEXP = re.compile(r"^gpu(:(?P<type_>[^:]+))?:(?P<count>[0-9]+)(?:\(.*\))?$")
 
 
 def parse_gpu_resource(generic_resources: str) -> tuple[str, str]:
@@ -59,8 +59,11 @@ def parse_gpu_resource(generic_resources: str) -> tuple[str, str]:
         match = _GPU_GRES_REGEXP.match(resource.strip())
         if match is None:
             continue
-        gpu_gres_template = f"gpu:{match['type_']}:{{}}"
-        return gpu_gres_template, match["count"]
+        if(match['type_']):
+            gpu_gres_template = f"gpu:{match['type_']}:{{}}"
+        else:
+            gpu_gres_template = f"gpu:{{}}"
+        return gpu_gres_template, match["count"], match["type_"]
     raise ValueError(f"No GPU resource in '{generic_resources}'.")
 
 
