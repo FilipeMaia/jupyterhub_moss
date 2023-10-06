@@ -119,6 +119,15 @@ class MOSlurmSpawner(SlurmSpawner):
         """
         partitions_info: dict[str, PartitionResources] = {}
 
+        partition_nnodes_idle = {}
+        partition_nnodes_total = {}
+        partition_ncores_idle = {}
+        partition_ncores_total = {}
+        partition_gpu_gres_templates = {}
+        partition_gpus_total = {}
+        partition_max_nproc = {}
+        partition_max_mem = {}
+        partition_runtime = {}
         for line in slurm_info_out.splitlines():
             (
                 partition,
@@ -134,8 +143,10 @@ class MOSlurmSpawner(SlurmSpawner):
             # core count - allocated/idle/other/total
             _, ncores_idle, _, ncores_total = ncores.split("/")
             # gpu count - gpu:type:total(indices)
+
             try:
-                gpu_gres_template, gpus_total = parse_gpu_resource(generic_resources)
+                gpu_gres_template, gpus = parse_gpu_resource(generic_resources)
+                gpus_total += gpus
             except ValueError:
                 gpu_gres_template = ""
                 gpus_total = "0"
@@ -148,19 +159,39 @@ class MOSlurmSpawner(SlurmSpawner):
                 )
                 max_runtime = datetime.timedelta(days=1)
 
+            if partition in partition_nnodes_idle:
+                partition_nnodes_idle[partition] += nnodes_idle
+                partition_nnodes_total[partition] += nnodes_total
+                partition_ncores_idle[partition] += ncores_idle
+                partition_ncores_total[partition] += ncores_total
+                partition_gpus_total[partition] += gpus_total
+                partition_gpu_gres_templates[partition].append(gpu_gres_template)
+                partition_max_nproc[partition] = max(partition_max_nproc[partition],ncores_per_node.rstrip("+"))
+                partition_max_mem[partition] = max(partition_max_mem[partition],memory.rstrip("+"))
+            else:
+                partition_nnodes_idle[partition] = nnodes_idle
+                partition_nnodes_total[partition] = nnodes_total
+                partition_ncores_idle[partition] = ncores_idle
+                partition_ncores_total[partition] = ncores_total
+                partition_gpus_total[partition] = gpus_total
+                partition_gpu_gres_templates[partition] = [gpu_gres_template]
+                partition_max_nproc[partition] = ncores_per_node.rstrip("+")
+                partition_max_mem[partition] = memory.rstrip("+")
+                partition_runtime[partition] = max_runtime.total_seconds()
+        for partition in partition_nnodes_idle.keys():
             try:
                 resources = PartitionAllResources(
                     # display resource counts
-                    nnodes_total=nnodes_total,
-                    nnodes_idle=nnodes_idle,
-                    ncores_total=ncores_total,
-                    ncores_idle=ncores_idle,
+                    nnodes_total=partition_nnodes_total[partition],
+                    nnodes_idle=partition_nnodes_idle[partition],
+                    ncores_total=partition_ncores_total[partition],
+                    ncores_idle=partition_ncores_idle[partition],
                     # required resource counts
-                    max_nprocs=ncores_per_node.rstrip("+"),
-                    max_mem=memory.rstrip("+"),
-                    gpu=gpu_gres_template,
-                    max_ngpus=gpus_total,
-                    max_runtime=max_runtime.total_seconds(),
+                    max_nprocs=partition_max_nproc[partition],
+                    max_mem=partition_max_mem[partition],
+                    gpu=partition_gpu_gres_templates[partition],
+                    max_ngpus=partition_gpus_total[partition],
+                    max_runtime=partition_runtime[partition],
                 )
             except ValidationError as err:
                 self.log.error("Error parsing output of slurm_info_cmd: %s", err)
