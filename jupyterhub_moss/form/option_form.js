@@ -394,6 +394,15 @@ function updatePartitionLimits() {
     setVisible(element, isVisible);
     setVisible(document.querySelector(`label[for="${element.id}"]`), isVisible);
   });
+
+  document.querySelectorAll('select[name="gpu_type"] option').forEach(opt => {
+    const isVisible = info.gpu_types.includes(opt.value);
+    opt.disabled = !isVisible;
+    // Make sure to always select the Any option when the partition changes
+    if(opt.value == 'Any'){
+      opt.selected = true;
+    }
+  });
 }
 
 function storeConfigToLocalStorage() {
