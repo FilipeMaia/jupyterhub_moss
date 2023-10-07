@@ -339,6 +339,8 @@ class MOSlurmSpawner(SlurmSpawner):
             if not gpu_gres_template:
                 raise RuntimeError("GPU(s) not available for this partition")
             options.gres = gpu_gres_template.format(options.ngpus)
+            if options.gpu_type != 'Any':
+                options.gres = "gpu:{}:{}".format(options.gpu_type, options.ngpus)
 
         # Use first env from the partition if none is requested
         if (

@@ -115,6 +115,27 @@ window.SLURM_DATA = JSON.parse('{{ jsondata }}');
       {% endfor %}
     </div>
     </div>
+
+    <div id="gpu_type_simple">
+      <h4 class="subheading">GPU Type</h4>
+      <div class="radio-toolbar">
+        {% set all_gpu_types = [] %}
+        {% for partition in partitions.values() %}
+        {% for gpu_type in partition.gpu_types if gpu_type not in all_gpu_types %}
+           {% set dummy = all_gpu_types.append(gpu_type) %}
+        {% endfor %}
+        {% endfor %}
+        {% for gpu_type in all_gpu_types %}
+        <input
+          type="radio"
+          id="{{ gpu_type }}"
+          name="gpu_type_simple"
+          value="{{ gpu_type }}"
+        />
+        <label for="{{ gpu_type }}">{{ gpu_type }}</label>
+        {% endfor %}
+      </div>
+    </div>
     <h4 class="subheading">Options</h4>
     <div class="form-container">
       <label for="environment_simple" accesskey="e">
@@ -206,6 +227,17 @@ window.SLURM_DATA = JSON.parse('{{ jsondata }}');
       />
       <span class="label-extra-info">&nbsp;/&nbsp;<span id="max_ngpus_span">-</span></span>
     </div>
+    <label for="gpu_type" accesskey="p">
+      GPU Type <span class="label-extra-info">(--gres:gpu:&lt;type&gt;)</span>:
+    </label>
+    <select
+      name="gpu_type"
+      id="gpu_type"
+    >
+      {% for gpu_type in all_gpu_types %}
+      <option value="{{ gpu_type }}">{{ gpu_type }}</option>
+      {% endfor %}
+    </select>
     <label for="runtime" accesskey="r">
       Job duration <span class="label-extra-info">(as hh:mm:ss, --time)</span>:
     </label>

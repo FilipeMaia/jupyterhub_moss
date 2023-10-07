@@ -280,8 +280,10 @@ function updateAddCustomEnvironment() {
 function setSimplePartition(name) {
   const partitionElem = document.getElementById('partition');
   const gpuDivSimple = document.getElementById('gpu_simple');
+  const gpuTypeDivSimple = document.getElementById('gpu_type_simple');
   const gpuRadio0Simple = document.getElementById('0Gpu');
   const ngpusElem = document.getElementById('ngpus');
+  const gpuTypeAnyElem = document.getElementById('Any');
   const fourCoreSimple = document.getElementById('fourCores');
   const quarterCoreSimple = document.getElementById('quarterCore');
   const quarterCoresLabel = document.querySelector(
@@ -298,10 +300,13 @@ function setSimplePartition(name) {
 
   // Toggle GPU choice display
   setVisible(gpuDivSimple, info.max_ngpus !== 0);
+  setVisible(gpuTypeDivSimple, info.max_ngpus !== 0);
 
   // Reset ngpus and GPUs choice
   gpuRadio0Simple.checked = true;
   ngpusElem.value = '0';
+
+  gpuTypeAnyElem.checked = true;
 
   // Update displayed NProcs info and values
   // Get number of CPUs for given paritition choice
@@ -383,6 +388,12 @@ function updatePartitionLimits() {
     setVisible(element, isVisible);
     setVisible(document.querySelector(`label[for="${element.id}"]`), isVisible);
   });
+
+  document.querySelectorAll('input[name="gpu_type_simple"]').forEach((element) => {
+    const isVisible = info.gpu_types.includes(element.value);
+    setVisible(element, isVisible);
+    setVisible(document.querySelector(`label[for="${element.id}"]`), isVisible);
+  });
 }
 
 function storeConfigToLocalStorage() {
@@ -425,6 +436,8 @@ function storeConfigToLocalStorage() {
           .id,
         ngpusId: document.querySelector('input[name="ngpus_simple"]:checked')
           .id,
+        gpuTypeId: document.querySelector('input[name="gpu_type_simple"]:checked')
+          .id,
         runtime: runtimeSelect.value,
       },
       fields: fields,
@@ -463,7 +476,7 @@ function restoreConfigFromLocalStorage() {
     }
   } else {
     // Restore simple tab
-    for (const key of ['partitionId', 'nprocsId', 'ngpusId']) {
+    for (const key of ['partitionId', 'nprocsId', 'ngpusId', 'gpuTypeId']) {
       const element = document.getElementById(config['simple'][key]);
       if (element !== null) {
         element.checked = true;
@@ -485,6 +498,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const nprocsElem = document.getElementById('nprocs');
   const ngpusElem = document.getElementById('ngpus');
+  const gpuTypeElem = document.getElementById('gpu_type');
   const runtimeElem = document.getElementById('runtime');
   const defaultUrlCheckboxElem = document.getElementById('default_url');
   const environmentAddRadio = document.getElementById('environment_add_radio');
@@ -518,6 +532,13 @@ document.addEventListener('DOMContentLoaded', () => {
       ngpusElem.value = e.target.value;
     });
   });
+  // GPU Type
+  document.querySelectorAll('input[name="gpu_type_simple"]').forEach((element) => {
+    element.addEventListener('change', (e) => {
+      gpuTypeElem.value = e.target.value;
+    });
+  });
+
   // JupyterLab using default_url field
   document
     .getElementById('jupyterlab_simple')

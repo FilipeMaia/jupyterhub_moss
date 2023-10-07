@@ -147,6 +147,7 @@ class UserOptions(BaseModel):
     # Extra fields
     gres: str = ""
     prologue: str = ""
+    gpu_type: str = ""
 
     @classmethod
     def parse_formdata(cls, formdata: dict[str, list[str]]) -> UserOptions:
